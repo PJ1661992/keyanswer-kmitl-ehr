@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="th" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NS KMITL Medical Records</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Sarabun', sans-serif; }
+    .patient-card:hover { transform: translateY(-2px); }
+    .sidebar-item.active { background: rgba(13,148,136,0.15); border-left: 4px solid #0d9488; color: #0d9488; }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    .answer-hidden { display: none; }
+    textarea { resize: vertical; }
+
+    @media print {
+      header, aside, .no-print { display: none !important; }
+      main { padding: 0 !important; }
+      #section-dashboard, #section-patients { display: none !important; }
+      #section-answer { display: block !important; }
+      .print-break { page-break-before: always; }
+      body { background: white !important; }
+      .answer-hidden { display: none !important; }
+      .answer-box { background: #f8fafc !important; border: 1px solid #cbd5e1 !important; }
+    }
+  </style>
+</head>
+<body class="h-full bg-slate-100 overflow-auto">
+<div id="app" class="h-full w-full flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-[#E35205] to-[#f47321] text-white shadow-lg flex-shrink-0 no-print">
+    <div class="px-6 py-4 flex items-center gap-4">
+      <div class="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-md">
+        <svg class="w-8 h-8 text-[#E35205]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold tracking-wide">NS KMITL PATIENT DATA</h1>
+        <p class="text-orange-100 text-sm italic">Smart EHR System for Virtual Learning</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white shadow-lg flex-shrink-0 overflow-y-auto z-10 no-print">
+      <nav class="py-4">
+        <button onclick="showSection('dashboard')" id="btn-dashboard" class="sidebar-item active w-full flex items-center gap-3 px-6 py-4 text-slate-700 font-bold transition-all">แดชบอร์ด</button>
+        <button onclick="showSection('patients')"  id="btn-patients"  class="sidebar-item w-full flex items-center gap-3 px-6 py-4 text-slate-700 font-bold transition-all">รายชื่อผู้ป่วย</button>
+        <button onclick="showSection('answer')"    id="btn-answer"    class="sidebar-item w-full flex items-center gap-3 px-6 py-4 text-slate-700 font-bold transition-all">📝 Answer Sheet</button>
+      </nav>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto p-6 relative">
+
+      <!-- Dashboard -->
+      <section id="section-dashboard" class="fade-in">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100"><p class="text-slate-500 text-sm font-bold">ผู้ป่วยทั้งหมด</p><h3 class="text-4xl font-black text-teal-600 mt-2" id="dash-count">0</h3></div>
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100"><p class="text-slate-500 text-sm font-bold">วิกฤต</p><h3 class="text-4xl font-black text-red-500 mt-2" id="dash-critical">0</h3></div>
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100"><p class="text-slate-500 text-sm font-bold">เฝ้าระวัง</p><h3 class="text-4xl font-black text-amber-500 mt-2" id="dash-watch">0</h3></div>
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100"><p class="text-slate-500 text-sm font-bold">ปกติ</p><h3 class="text-4xl font-black text-green-500 mt-2" id="dash-normal">0</h3></div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+          <h2 class="text-xl font-bold text-slate-800 mb-6 border-b pb-4">รายการผู้ป่วยทั้งหมด</h2>
+          <div class="space-y-4" id="recent-patients"></div>
+        </div>
+      </section>
+
+      <!-- รายชื่อผู้ป่วย -->
+      <section id="section-patients" class="hidden fade-in">
+        <div class="mb-8">
+          <h2 class="text-2xl font-bold text-slate-800">ฐานข้อมูลผู้ป่วยกรณีศึกษา (Case Study)</h2>
+          <p class="text-slate-500 text-sm mt-1">คลิก "เปิดเวชระเบียน" เพื่อดูข้อมูลละเอียด</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th class="text-left px-6 py-4 font-bold text-slate-600">HN</th>
+                <th class="text-left px-6 py-4 font-bold text-slate-600">ชื่อ-นามสกุล (อายุ)</th>
+                <th class="text-left px-6 py-4 font-bold text-slate-600">อาชีพ</th>
+                <th class="text-left px-6 py-4 font-bold text-slate-600">สถานะ</th>
+                <th class="text-left px-6 py-4 font-bold text-slate-600">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="patients-table-body" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Answer Sheet -->
+      <section id="section-answer" class="hidden fade-in">
+        <div class="flex items-center justify-between mb-6 no-print">
+          <div>
+            <h2 class="text-2xl font-bold text-slate-800">📝 Answer Sheet — กรณีศึกษาพยาบาล</h2>
+            <p class="text-slate-500 text-sm mt-1">เลือกเคส จากนั้นกรอกคำตอบและตรวจสอบเฉลย</p>
+          </div>
+          <button onclick="window.print()" class="no-print flex items-center gap-2 bg-slate-700 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all">
+            🖨️ Print / บันทึก PDF
+          </button>
+        </div>
+
+        <!-- เลือกเคส -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 mb-6 no-print">
+          <p class="font-bold text-slate-700 mb-3 text-sm">เลือกกรณีศึกษา:</p>
+          <div class="flex flex-wrap gap-3" id="case-selector"></div>
+        </div>
+
+        <!-- ฟอร์ม Answer Sheet -->
+        <div id="answer-sheet-container"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Modal เวชระเบียน -->
+  <div id="patient-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm no-print">
+    <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[90%] overflow-y-auto shadow-2xl">
+      <div class="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-20">
+        <h2 id="modal-title" class="text-2xl font-bold text-teal-800">รายละเอียดข้อมูล</h2>
+        <button onclick="closeModal()" class="p-2 bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 rounded-full transition-all">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="patient-modal-content" class="p-8"></div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="bg-slate-800 text-slate-400 py-8 px-6 w-full border-t border-slate-700 no-print">
+  <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+    <div class="text-center md:text-left">
+      <p class="font-bold text-slate-200 text-lg">NS KMITL Smart EHR System</p>
+      <p class="text-sm opacity-80">School of Nursing, King Mongkut's Institute of Technology Ladkrabang</p>
+    </div>
+    <div class="text-center md:text-right">
+      <p class="text-base font-medium">Created by <span class="text-orange-500 font-bold">Aj. Paranee Jiratheerarat</span></p>
+      <p class="text-[10px] mt-2 text-slate-500 uppercase tracking-widest">© 2026 All Rights Reserved.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ============================================================
+// ข้อมูลผู้ป่วย
+// ============================================================
+const patients = [
+  {
+    hn:"HN-680001", name:"นางจาเนล (Janelle) วันใหม่", age:45, phone:"081-111-2222", status:"เฝ้าระวัง",
+    sex:"Female", gender:"หญิง (Woman)", occupation:"ผู้จัดการฝ่ายบัญชี",
+    chiefComplaints:"ใจสั่น นอนไม่หลับมา 3 วัน ปวดตื้อๆ ท้ายทอย",
+    presentIllness:"เครียดจากงานสะสม นอนวันละ 3-4 ชม.", allergies:"ไม่มี",
+    vitals:{bloodPressure:"160/95",heartRate:"115",temperature:"37.0",respiratoryRate:"22"},
+    physicalExam:"General: หน้าตาดูอิดโรย ขอบตาดำ คลำพบกล้ามเนื้อบ่าและต้นคอตึงตัว (Muscle tension), Heart: Tachycardia, Lung: Clear",
+    gordonPatterns:[
+      {name:"1. การรับรู้สุขภาพ",notes:"ละเลยการตรวจสุขภาพประจำปี"},
+      {name:"2. โภชนาการ",notes:"ดื่มกาแฟวันละ 4 แก้ว กินอาหารจานด่วน"},
+      {name:"3. การขับถ่าย",notes:"ท้องผูก 3 วันถ่ายครั้ง"},
+      {name:"4. กิจกรรม",notes:"นั่งทำงานหน้าคอมพิวเตอร์วันละ 12 ชม."},
+      {name:"5. การพักผ่อน",notes:"สะดุ้งตื่นตี 2 หลับต่อไม่ได้"},
+      {name:"6. การรับรู้สติ",notes:"ปวดตื้อท้ายทอยร้าวขึ้นขมับ"},
+      {name:"7. อัตมโนทัศน์",notes:"กังวลว่าทำงานได้แย่ลง"},
+      {name:"8. สัมพันธภาพ",notes:"โสด ปลีกตัวจากสังคม"},
+      {name:"9. เพศสภาพ",notes:"ระบุเพศหญิง ประจำเดือนมาไม่สม่ำเสมอจากความเครียด"},
+      {name:"10. ความทนทานเครียด",notes:"ใช้การทำงานเพื่อหนีความเครียด"},
+      {name:"11. คุณค่าความเชื่อ",notes:"เชื่อว่าความสำเร็จในงานคือทุกอย่าง"}
+    ],
+    nursingNotes:[{date:"20/02/2026 08:30",note:"รับใหม่ด้วยอาการใจสั่น BP สูง",nurse:"พย.ฟ้าใส"}],
+    answerSheet:{
+      dx_choices:[
+        "พักผ่อนไม่เพียงพอเนื่องจากความเครียดและความวิตกกังวล",
+        "เสี่ยงต่อภาวะความดันโลหิตสูงขั้นวิกฤตเนื่องจากความเครียดสะสมและพฤติกรรมสุขภาพที่ไม่เหมาะสม",
+        "ปวดศีรษะเรื้อรังเนื่องจากความตึงตัวของกล้ามเนื้อจากความเครียด",
+        "ขาดความรู้เรื่องการจัดการความเครียดและการดูแลสุขภาพ"
+      ],
+      dx_correct:[0,1,2,3],
+      dx_priority_answer:"ลำดับที่ 1: ข้อ 2 (เสี่ยง BP วิกฤต) เพราะ BP 160/95 + HR 115 เสี่ยงต่อชีวิตทันที\nลำดับที่ 2: ข้อ 1 (พักผ่อนไม่เพียงพอ) เพราะเป็นต้นเหตุของ BP สูงและอาการทั้งหมด\nลำดับที่ 3: ข้อ 3 (ปวดศีรษะ) เพราะส่งผลต่อคุณภาพชีวิตและการทำงาน\nลำดับที่ 4: ข้อ 4 (ขาดความรู้) เพราะเป็นการแก้ปัญหาระยะยาว",
+      goal_answer:"ผู้ป่วยมีค่า BP ลดลงอยู่ในเกณฑ์ปกติ (< 140/90 mmHg) ภายใน 24 ชั่วโมง และสามารถนอนหลับพักผ่อนได้อย่างน้อย 6 ชั่วโมงต่อคืน",
+      criteria_choices:[
+        "BP ลดลงเหลือ < 140/90 mmHg",
+        "HR อยู่ในช่วง 60-100 ครั้ง/นาที",
+        "ผู้ป่วยรายงานนอนหลับได้ดีขึ้น ≥ 6 ชม./คืน",
+        "ผู้ป่วยระบุวิธีจัดการความเครียดได้อย่างน้อย 2 วิธี",
+        "ไม่มีอาการปวดศีรษะ หรือปวดลดลง ≤ 3/10",
+        "กล้ามเนื้อบ่าและต้นคอคลายตัว ไม่มี muscle tension"
+      ],
+      criteria_correct:[0,1,2,4,5],
+      nursing_activities_answer:"1. ติดตาม BP และ HR ทุก 2 ชม. บันทึกและรายงานแพทย์ทันทีหาก BP > 180/110\n2. จัดสิ่งแวดล้อมให้เงียบสงบ ลดแสง ลดเสียง เพื่อส่งเสริมการพักผ่อน\n3. สอนเทคนิคผ่อนคลาย เช่น การหายใจลึก (Deep breathing) และ Progressive muscle relaxation\n4. ให้ยาตามแผนการรักษา และติดตามอาการข้างเคียง\n5. สอนเกี่ยวกับการหลีกเลี่ยงคาเฟอีน การรับประทานอาหารที่ดี และการนอนหลับที่มีคุณภาพ\n6. รับฟังความกังวลของผู้ป่วย และประเมินระดับความเครียดด้วย Visual Analog Scale",
+      evaluation_answer:"ประเมิน BP และ HR ซ้ำหลังการพยาบาล 2 ชม. เปรียบเทียบค่าก่อน-หลัง\nสัมภาษณ์ผู้ป่วยถึงคุณภาพการนอนหลับและระดับความเครียด (0-10)\nประเมินความสามารถในการระบุวิธีจัดการความเครียดด้วยตนเอง\nสังเกตอาการปวดศีรษะและความตึงตัวของกล้ามเนื้อ"
+    }
+  },
+  {
+    hn:"HN-680002", name:"นายไบรอัน (Brian) วิลเคนส์", age:29, phone:"089-876-5432", status:"วิกฤต",
+    sex:"Male", gender:"ชาย (Man)", occupation:"นักศึกษาปริญญาโท",
+    chiefComplaints:"ปวดท้องน้อยด้านขวา (RLQ) รุนแรง อาเจียน",
+    presentIllness:"ปวดมวนรอบสะดือย้ายไปท้องน้อยขวามา 6 ชม.", allergies:"ไม่มี",
+    vitals:{bloodPressure:"120/80",heartRate:"105",temperature:"38.2",respiratoryRate:"20"},
+    physicalExam:"Abdomen: Guarding and Rigidity at RLQ, Positive Rebound tenderness, Bowel sound: Hyperactive",
+    gordonPatterns:[
+      {name:"1. การรับรู้สุขภาพ",notes:"ปกติแข็งแรงดี มารพ.เมื่อปวดมาก"},
+      {name:"2. โภชนาการ",notes:"เบื่ออาหาร อาเจียน 2 ครั้ง"},
+      {name:"3. การขับถ่าย",notes:"ปกติ ไม่พบท้องเสีย"},
+      {name:"4. กิจกรรม",notes:"นอนงอตัว กุมท้อง ขยับตัวลำบาก"},
+      {name:"5. การพักผ่อน",notes:"ไม่ได้นอนเพราะปวดท้อง"},
+      {name:"6. การรับรู้สติ",notes:"Pain score 8/10, Rebound tenderness +"},
+      {name:"7. อัตมโนทัศน์",notes:"กังวลเรื่องการผ่าตัด"},
+      {name:"8. สัมพันธภาพ",notes:"เพื่อนร่วมหอพักพามาส่ง"},
+      {name:"9. เพศสภาพ",notes:"ระบุเพศชาย ไม่มีปัญหาด้านอัตลักษณ์ทางเพศ"},
+      {name:"10. ความทนทานเครียด",notes:"ร้องโอดครวญจากความปวด"},
+      {name:"11. คุณค่าความเชื่อ",notes:"ยินยอมรักษาทุกวิธี"}
+    ],
+    nursingNotes:[{date:"20/02/2026 10:00",note:"NPO, เตรียมส่ง CT-Abdomen",nurse:"พย.สมาร์ท"}],
+    answerSheet:{
+      dx_choices:[
+        "ปวดเฉียบพลันเนื่องจากการอักเสบของไส้ติ่ง",
+        "เสี่ยงต่อการติดเชื้อในกระแสเลือด (Sepsis) เนื่องจากการอักเสบเฉียบพลัน",
+        "ภาวะขาดน้ำเนื่องจากอาเจียนและ NPO",
+        "วิตกกังวลเนื่องจากความกลัวการผ่าตัดและสถานการณ์ไม่แน่นอน"
+      ],
+      dx_correct:[0,1,2,3],
+      dx_priority_answer:"ลำดับที่ 1: ข้อ 1 (ปวดเฉียบพลัน) เพราะ Pain score 8/10 ส่งผลต่อการหายใจและการเคลื่อนไหว\nลำดับที่ 2: ข้อ 2 (เสี่ยง Sepsis) เพราะไข้ 38.2°C + Rebound tenderness บ่งชี้การอักเสบรุนแรง\nลำดับที่ 3: ข้อ 3 (ขาดน้ำ) เพราะอาเจียนและ NPO ทำให้เสียสมดุลสารน้ำ\nลำดับที่ 4: ข้อ 4 (วิตกกังวล) เพราะส่งผลต่อจิตใจและความร่วมมือในการรักษา",
+      goal_answer:"ผู้ป่วยได้รับการบรรเทาปวดจนระดับ Pain score ≤ 3/10 และไม่เกิดภาวะแทรกซ้อนก่อนผ่าตัด",
+      criteria_choices:[
+        "Pain score ลดลงเหลือ ≤ 3/10",
+        "ไข้ลดลงเหลือ < 38.0°C",
+        "ไม่มีสัญญาณ Peritonitis แพร่กระจาย (Guarding ไม่เพิ่มขึ้น)",
+        "ผู้ป่วยสามารถอธิบายขั้นตอนการผ่าตัดได้",
+        "ผู้ป่วยแสดงออกว่าวิตกกังวลลดลง",
+        "สัญญาณชีพคงที่ HR < 100 ครั้ง/นาที"
+      ],
+      criteria_correct:[0,1,2,5],
+      nursing_activities_answer:"1. ประเมิน Pain score ทุก 1 ชม. และบันทึกตำแหน่ง ลักษณะ การแพร่กระจายของอาการปวด\n2. จัดท่านอนที่สุขสบาย (Fowler's position) ลดแรงตึงผนังหน้าท้อง\n3. ให้ยาแก้ปวดและยาปฏิชีวนะตามแผนการรักษา ติดตามผล\n4. ติดตาม Vital signs และสัญญาณของ Peritonitis ทุก 30 นาที\n5. ดูแล IV fluid ให้เพียงพอ บันทึก I/O อย่างละเอียด\n6. เตรียมผู้ป่วยและญาติก่อนผ่าตัด อธิบายขั้นตอน ลดความวิตกกังวล",
+      evaluation_answer:"ประเมิน Pain score ซ้ำหลังให้ยาแก้ปวด 30 นาที\nติดตามอุณหภูมิร่างกายและ Vital signs เปรียบเทียบกับ Baseline\nตรวจ Abdomen ซ้ำเพื่อประเมินว่า Guarding และ Rebound tenderness เพิ่มขึ้นหรือไม่\nสังเกตระดับความวิตกกังวลของผู้ป่วยจากภาษากายและคำพูด"
+    }
+  },
+  {
+    hn:"HN-680003", name:"นางสมศรี มีสุข", age:62, phone:"082-222-3333", status:"เฝ้าระวัง",
+    sex:"Female", gender:"หญิง (Woman)", occupation:"แม่บ้าน / เกษียณ",
+    chiefComplaints:"น้ำตาลในเลือดสูง อ่อนเพลีย ปัสสาวะบ่อย",
+    presentIllness:"เบาหวานเดิม คุมอาหารไม่ได้มา 1 เดือน", allergies:"ยาซัลฟา",
+    vitals:{bloodPressure:"145/90",heartRate:"88",temperature:"36.5",respiratoryRate:"18"},
+    physicalExam:"Extremities: ปลายเท้าชาทั้ง 2 ข้าง, พบแผลกดทับที่ส้นเท้าซ้ายขนาด 1 ซม. แผลแห้ง, Skin: Dry and poor turgor",
+    gordonPatterns:[
+      {name:"1. การรับรู้สุขภาพ",notes:"กินยาไม่สม่ำเสมอ"},
+      {name:"2. โภชนาการ",notes:"ชอบขนมหวานและผลไม้รสหวาน"},
+      {name:"3. การขับถ่าย",notes:"ปัสสาวะบ่อยคืนละ 4-5 ครั้ง"},
+      {name:"4. กิจกรรม",notes:"เหนื่อยง่ายเวลาเดินไกล"},
+      {name:"5. การพักผ่อน",notes:"นอนไม่หลับเพราะลุกมาปัสสาวะ"},
+      {name:"6. การรับรู้สติ",notes:"ปกติ ถามตอบรู้เรื่อง"},
+      {name:"7. อัตมโนทัศน์",notes:"เบื่อหน่ายที่ต้องกินยาตลอดชีวิต"},
+      {name:"8. สัมพันธภาพ",notes:"อาศัยอยู่กับลูกหลาน"},
+      {name:"9. เพศสภาพ",notes:"ระบุเพศหญิง หมดประจำเดือนแล้ว"},
+      {name:"10. ความทนทานเครียด",notes:"วิตกกังวลเรื่องแผลที่เท้า"},
+      {name:"11. คุณค่าความเชื่อ",notes:"ทำบุญตักบาตรทุกเช้า"}
+    ],
+    nursingNotes:[{date:"20/02/2026 09:00",note:"DTX = 250 mg/dL",nurse:"พย.ใจดี"}],
+    answerSheet:{
+      dx_choices:[
+        "ระดับน้ำตาลในเลือดสูงกว่าปกติเนื่องจากการควบคุมอาหารและการใช้ยาไม่เหมาะสม",
+        "เสี่ยงต่อการเกิดแผลติดเชื้อเนื่องจากมีแผลที่เท้าและระดับน้ำตาลสูง",
+        "ขาดความรู้และทักษะในการดูแลตนเองเกี่ยวกับโรคเบาหวาน",
+        "พักผ่อนไม่เพียงพอเนื่องจากปัสสาวะบ่อยตอนกลางคืน"
+      ],
+      dx_correct:[0,1,2,3],
+      dx_priority_answer:"ลำดับที่ 1: ข้อ 2 (เสี่ยงแผลติดเชื้อ) เพราะ DTX 250 + มีแผลที่เท้า เสี่ยงต่อการสูญเสียขา\nลำดับที่ 2: ข้อ 1 (น้ำตาลสูง) เพราะเป็นปัญหาหลักที่ต้องควบคุมเร่งด่วน\nลำดับที่ 3: ข้อ 3 (ขาดความรู้) เพราะเป็นรากเหง้าของปัญหาทั้งหมด\nลำดับที่ 4: ข้อ 4 (พักผ่อนไม่พอ) เพราะเป็นผลจากน้ำตาลสูง จะดีขึ้นเมื่อควบคุมเบาหวานได้",
+      goal_answer:"ระดับน้ำตาลในเลือดลดลงเหลือ < 180 mg/dL ภายใน 24 ชม. และแผลที่เท้าไม่มีสัญญาณการติดเชื้อ",
+      criteria_choices:[
+        "DTX < 180 mg/dL",
+        "แผลที่เท้าสะอาด ไม่มีรอยแดง บวม หรือมีหนอง",
+        "ผู้ป่วยสามารถบอกอาหารที่ควรหลีกเลี่ยงได้อย่างน้อย 3 อย่าง",
+        "ผู้ป่วยสาธิตการตรวจเท้าด้วยตนเองได้ถูกต้อง",
+        "BP < 140/90 mmHg",
+        "ผู้ป่วยกินยาได้ครบตามมื้อที่กำหนด"
+      ],
+      criteria_correct:[0,1,2,3,5],
+      nursing_activities_answer:"1. ติดตาม DTX ก่อนอาหารและก่อนนอน บันทึกและรายงานแพทย์หาก DTX > 300 mg/dL\n2. ทำแผลที่เท้าด้วยเทคนิคปราศจากเชื้อ ประเมินขนาด สี และลักษณะแผลทุกวัน\n3. สอนการตรวจเท้าด้วยตนเองทุกวัน และการดูแลเท้าในผู้ป่วยเบาหวาน\n4. ให้ความรู้เรื่องอาหารแลกเปลี่ยนสำหรับผู้ป่วยเบาหวาน เน้นหลีกเลี่ยงน้ำตาลและคาร์โบไฮเดรตสูง\n5. กระตุ้นการกินยาตามเวลา และอธิบายความสำคัญของการใช้ยาสม่ำเสมอ\n6. ประเมินความรู้และทัศนคติต่อโรคเบาหวาน เสริมแรงทางบวก",
+      evaluation_answer:"ติดตาม DTX ซ้ำทุก 4 ชม. เปรียบเทียบกับค่า Baseline\nตรวจแผลที่เท้าทุกวัน ประเมินสัญญาณการติดเชื้อ (รอยแดง บวม ร้อน มีหนอง)\nทดสอบความรู้ผู้ป่วยด้วยการถามตอบและให้สาธิตการตรวจเท้า\nตรวจสอบความสม่ำเสมอในการกินยาจากการสอบถามและนับยา"
+    }
+  },
+  {
+    hn:"HN-680006", name:"นายสมปอง น้องพี่", age:35, phone:"081-333-4444", status:"เฝ้าระวัง",
+    sex:"Male", gender:"ชาย (Man)", occupation:"พนักงานบริษัทเอกชน",
+    chiefComplaints:"ไข้สูง ไอแห้ง เจ็บคอ ปวดเมื่อยตัว",
+    presentIllness:"เป็นไข้มา 2 วัน ตรวจ ATK ผลลบ", allergies:"ไม่มี",
+    vitals:{bloodPressure:"122/82",heartRate:"96",temperature:"38.9",respiratoryRate:"20"},
+    physicalExam:"HEENT: Pharynx and Tonsils injected (แดง), No exudate, Lymph nodes: Submandibular enlarged",
+    gordonPatterns:[
+      {name:"1. การรับรู้สุขภาพ",notes:"ซื้อยาลดไข้กินเองแต่ไม่ดีขึ้น"},
+      {name:"2. โภชนาการ",notes:"ดื่มน้ำน้อย กลืนลำบาก"},
+      {name:"3. การขับถ่าย",notes:"ปัสสาวะสีเหลืองเข้ม"},
+      {name:"4. กิจกรรม",notes:"อ่อนเพลีย ขาดแรงจูงใจ"},
+      {name:"5. การพักผ่อน",notes:"หนาวสั่นจนนอนไม่หลับ"},
+      {name:"6. การรับรู้สติ",notes:"เพลีย มึนศีรษะ"},
+      {name:"7. อัตมโนทัศน์",notes:"กังวลว่าจะติดเชื้อรุนแรง"},
+      {name:"8. สัมพันธภาพ",notes:"พักอยู่คนเดียว"},
+      {name:"9. เพศสภาพ",notes:"ระบุเพศชาย ไม่มีปัญหาด้านอัตลักษณ์ทางเพศ"},
+      {name:"10. ความทนทานเครียด",notes:"หงุดหงิดจากการเจ็บป่วย"},
+      {name:"11. คุณค่าความเชื่อ",notes:"ปกติ"}
+    ],
+    nursingNotes:[{date:"20/02/2026 14:15",note:"Paracetamol 500mg, เช็ดตัวลดไข้",nurse:"พย.สายฝน"}],
+    answerSheet:{
+      dx_choices:[
+        "อุณหภูมิร่างกายสูงกว่าปกติเนื่องจากการติดเชื้อที่คอและต่อมทอนซิล",
+        "ภาวะขาดน้ำเนื่องจากดื่มน้ำน้อยและสูญเสียน้ำจากไข้",
+        "ปวดเมื่อยกล้ามเนื้อและอ่อนเพลียเนื่องจากกระบวนการอักเสบ",
+        "วิตกกังวลเนื่องจากความกังวลเรื่องการติดเชื้อรุนแรงและอยู่คนเดียว"
+      ],
+      dx_correct:[0,1,2,3],
+      dx_priority_answer:"ลำดับที่ 1: ข้อ 1 (ไข้สูง) เพราะ BT 38.9°C เสี่ยงต่อภาวะชักจากไข้สูง\nลำดับที่ 2: ข้อ 2 (ขาดน้ำ) เพราะปัสสาวะสีเข้มและดื่มน้ำน้อย เสี่ยงต่อ Dehydration\nลำดับที่ 3: ข้อ 3 (ปวดเมื่อย/อ่อนเพลีย) เพราะส่งผลต่อการดูแลตนเองและการฟื้นตัว\nลำดับที่ 4: ข้อ 4 (วิตกกังวล) เพราะส่งผลต่อการนอนหลับและการฟื้นตัว",
+      goal_answer:"อุณหภูมิร่างกายลดลงเหลือ < 37.5°C ภายใน 4-6 ชั่วโมงหลังให้การพยาบาล และผู้ป่วยมีความชุ่มชื้นเพียงพอ",
+      criteria_choices:[
+        "BT < 37.5°C ภายใน 4-6 ชม.",
+        "ผู้ป่วยดื่มน้ำได้ ≥ 1,500-2,000 mL/วัน",
+        "ปัสสาวะใสขึ้น ปริมาณ ≥ 30 mL/ชม.",
+        "ผู้ป่วยบอกว่าปวดเมื่อยลดลง ≤ 3/10",
+        "HR < 100 ครั้ง/นาที",
+        "ผู้ป่วยแสดงออกว่าวิตกกังวลลดลง"
+      ],
+      criteria_correct:[0,1,2,3,4],
+      nursing_activities_answer:"1. วัดอุณหภูมิร่างกายทุก 1-2 ชม. บันทึกและรายงานแพทย์หาก BT > 39.5°C\n2. ให้ยา Paracetamol ตามแผนการรักษา ติดตามผลหลังให้ยา 30 นาที\n3. เช็ดตัวด้วยน้ำอุ่น (Tepid sponge) บริเวณซอกคอ รักแร้ ขาหนีบ\n4. กระตุ้นให้ดื่มน้ำอุ่นบ่อยๆ อย่างน้อย 1.5-2 ลิตร/วัน\n5. จัดสิ่งแวดล้อมให้เย็นสบาย ระบายอากาศดี ใส่เสื้อผ้าเบาบาง\n6. ติดตาม I/O สังเกตสีปัสสาวะและประเมินภาวะขาดน้ำ",
+      evaluation_answer:"วัดอุณหภูมิซ้ำทุก 1 ชม. หลังการพยาบาล เปรียบเทียบแนวโน้ม\nประเมินการดื่มน้ำและปริมาณปัสสาวะ บันทึก I/O ทุก 8 ชม.\nสังเกตสีและปริมาณปัสสาวะ ประเมินสัญญาณขาดน้ำ (ปากแห้ง ผิวแห้ง)\nถามผู้ป่วยถึงอาการปวดเมื่อยและความรู้สึกอ่อนเพลีย"
+    }
+  },
+  {
+    hn:"HN-680010", name:"นายต้นกล้า รักสุข", age:38, phone:"081-000-1111", status:"เฝ้าระวัง",
+    sex:"Male", gender:"ชาย (Man)", occupation:"พนักงานโรงงานอุตสาหกรรม",
+    chiefComplaints:"หายใจเหนื่อยหอบ แน่นหน้าอก มีเสียงหวีด (Wheezing) มา 1 วัน",
+    presentIllness:"ประวัติโรคหืด สัมผัสควันบุหรี่และฝุ่นในโรงงานมา 3 วัน อาการกำเริบในคืนที่ผ่านมา ใช้ยาพ่นเองแล้วไม่ดีขึ้น",
+    allergies:"ฝุ่น, ควันบุหรี่, NSAIDs",
+    vitals:{bloodPressure:"138/88",heartRate:"112",temperature:"37.4",respiratoryRate:"28"},
+    physicalExam:"General: นั่งพิงไม่ยอมนอนราบ (Orthopnea), ใช้กล้ามเนื้อช่วยหายใจ (Accessory muscle use), Lung: Expiratory wheezing both lungs, Prolonged expiration, Chest: Mild intercostal retraction, Heart: Tachycardia, SpO2: 93% on room air",
+    gordonPatterns:[
+      {name:"1. การรับรู้สุขภาพ",notes:"รู้จักโรคตัวเองดี มียาพ่นประจำแต่ใช้ไม่สม่ำเสมอ"},
+      {name:"2. โภชนาการ",notes:"เบื่ออาหารในช่วงกำเริบ น้ำหนักลดลง 3 กก. ใน 1 เดือน"},
+      {name:"3. การขับถ่าย",notes:"ปกติ"},
+      {name:"4. กิจกรรม",notes:"ทำงานโรงงานสัมผัสฝุ่นและสารเคมีทุกวัน กิจกรรมรายวันถูกจำกัดจากอาการหอบ"},
+      {name:"5. การพักผ่อน",notes:"นอนไม่ได้เพราะหายใจลำบากเวลานอนราบ ตื่นกลางดึกบ่อย"},
+      {name:"6. การรับรู้สติ",notes:"Dyspnea score 4/5, วิตกกังวลสูงขณะหายใจลำบาก"},
+      {name:"7. อัตมโนทัศน์",notes:"กังวลว่าต้องเปลี่ยนงาน"},
+      {name:"8. สัมพันธภาพ",notes:"อาศัยอยู่กับภรรยาและบุตร 2 คน ครอบครัวสนับสนุนดี"},
+      {name:"9. เพศสภาพ",notes:"ระบุเพศชาย บทบาทผู้นำครอบครัวสร้างแรงกดดันในการฟื้นตัวเร็ว"},
+      {name:"10. ความทนทานเครียด",notes:"เครียดเรื่องงานและค่าใช้จ่ายในการรักษา"},
+      {name:"11. คุณค่าความเชื่อ",notes:"ต้องการหายเพื่อกลับไปดูแลครอบครัว"}
+    ],
+    nursingNotes:[{date:"20/02/2026 11:10",note:"ให้ O2 Canula 3 LPM, พ่นยา Salbutamol + Ipratropium, ติดตาม SpO2 และ RR ทุก 15 นาที",nurse:"พย.สมาร์ท"}],
+    answerSheet:{
+      dx_choices:[
+        "การแลกเปลี่ยนก๊าซบกพร่องเนื่องจากการตีบแคบของหลอดลมจากโรคหืดกำเริบ",
+        "รูปแบบการหายใจไม่มีประสิทธิภาพเนื่องจากหลอดลมหดเกร็งและมีเสมหะ",
+        "กิจกรรมทนได้น้อยลงเนื่องจากหายใจลำบากและ SpO2 ต่ำ",
+        "ขาดความรู้เรื่องการหลีกเลี่ยงสิ่งกระตุ้นและการใช้ยาพ่นที่ถูกต้อง"
+      ],
+      dx_correct:[0,1,2,3],
+      dx_priority_answer:"ลำดับที่ 1: ข้อ 1 (การแลกเปลี่ยนก๊าซบกพร่อง) เพราะ SpO2 93% เสี่ยงต่อภาวะขาดออกซิเจน\nลำดับที่ 2: ข้อ 2 (หายใจไม่มีประสิทธิภาพ) เพราะ RR 28 + Accessory muscle use ทำให้เหนื่อยล้า\nลำดับที่ 3: ข้อ 3 (กิจกรรมลดลง) เพราะส่งผลต่อคุณภาพชีวิตและบทบาทหน้าที่\nลำดับที่ 4: ข้อ 4 (ขาดความรู้) เพราะการป้องกันการกำเริบซ้ำต้องการความรู้ที่ถูกต้อง",
+      goal_answer:"ผู้ป่วยมี SpO2 ≥ 95% และ RR กลับมาอยู่ในช่วง 12-20 ครั้ง/นาที ภายใน 1-2 ชั่วโมงหลังให้การพยาบาล",
+      criteria_choices:[
+        "SpO2 ≥ 95% on room air หรือ oxygen therapy",
+        "RR 12-20 ครั้ง/นาที",
+        "ไม่มีเสียง Wheezing หรือ Wheezing ลดลงชัดเจน",
+        "ผู้ป่วยรายงาน Dyspnea score ลดลงเหลือ ≤ 2/5",
+        "ผู้ป่วยสาธิตการใช้ยาพ่นได้ถูกต้อง",
+        "ไม่ใช้กล้ามเนื้อช่วยหายใจ (Accessory muscle)"
+      ],
+      criteria_correct:[0,1,2,3,5],
+      nursing_activities_answer:"1. จัดท่า High Fowler's position หรือท่านั่งเอนไปข้างหน้า (Tripod position) เพื่อขยายปอด\n2. ให้ O2 ตามแผนการรักษา ติดตาม SpO2 อย่างต่อเนื่อง\n3. ให้ยาพ่น Salbutamol (SABA) ตามแผน ติดตามผลและ HR หลังพ่นยา\n4. ติดตาม RR, SpO2, และ Breath sounds ทุก 15-30 นาที\n5. สอนการหายใจแบบ Pursed-lip breathing เพื่อลด Air trapping\n6. ให้ความรู้เรื่องการหลีกเลี่ยงสิ่งกระตุ้น (ฝุ่น ควัน) และความสำคัญของยาพ่นป้องกัน (ICS)",
+      evaluation_answer:"ติดตาม SpO2 และ RR ทุก 15 นาทีในชั่วโมงแรก จากนั้นทุก 30 นาที\nฟัง Breath sounds เปรียบเทียบก่อน-หลังพ่นยา\nประเมิน Dyspnea score และการใช้ Accessory muscles\nทดสอบความรู้ผู้ป่วยเรื่องการหลีกเลี่ยงสิ่งกระตุ้นและการใช้ยาพ่น"
+    }
+  }
+];
+
+// ============================================================
+// Dashboard & Table
+// ============================================================
+function renderDashboard() {
+  document.getElementById('dash-count').innerText    = patients.length;
+  document.getElementById('dash-critical').innerText = patients.filter(p=>p.status==='วิกฤต').length;
+  document.getElementById('dash-watch').innerText    = patients.filter(p=>p.status==='เฝ้าระวัง').length;
+  document.getElementById('dash-normal').innerText   = patients.filter(p=>p.status==='ปกติ').length;
+  document.getElementById('recent-patients').innerHTML = patients.map(p=>`
+    <div class="patient-card flex items-center justify-between p-5 bg-slate-50 rounded-2xl cursor-pointer border border-slate-100 hover:bg-white hover:shadow-md transition-all" onclick="showPatientDetail('${p.hn}')">
+      <div>
+        <p class="font-bold text-slate-800 text-lg">${p.name}</p>
+        <p class="text-sm text-teal-600 font-mono">${p.hn} | อายุ ${p.age} ปี | ${p.occupation}</p>
+      </div>
+      <span class="px-4 py-1.5 rounded-full font-bold text-xs ${statusColor(p.status)}">${p.status}</span>
+    </div>`).join('');
+}
+
+function renderPatientsTable() {
+  document.getElementById('patients-table-body').innerHTML = patients.map(p=>`
+    <tr class="hover:bg-slate-50/50">
+      <td class="px-6 py-4 font-mono text-teal-600 font-bold text-sm">${p.hn}</td>
+      <td class="px-6 py-4 font-bold text-slate-800">${p.name} (${p.age} ปี)</td>
+      <td class="px-6 py-4 text-slate-600 text-sm">${p.occupation}</td>
+      <td class="px-6 py-4"><span class="px-3 py-1 rounded-full font-bold text-xs ${statusColor(p.status)}">${p.status}</span></td>
+      <td class="px-6 py-4"><button onclick="showPatientDetail('${p.hn}')" class="text-teal-600 font-bold border-2 border-teal-500 px-4 py-1.5 rounded-xl hover:bg-teal-500 hover:text-white transition-all text-sm">เปิดเวชระเบียน</button></td>
+    </tr>`).join('');
+}
+
+function statusColor(s) {
+  return s==='วิกฤต' ? 'bg-red-100 text-red-700' : s==='เฝ้าระวัง' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
+}
+
+// ============================================================
+// Patient Detail Modal
+// ============================================================
+function showPatientDetail(hn) {
+  const p = patients.find(x=>x.hn===hn);
+  document.getElementById('modal-title').innerText = "KMITL Smart EHR: "+p.name;
+  document.getElementById('patient-modal-content').innerHTML = `
+    <div class="space-y-8">
+      <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">เพศกำเนิด (Sex)</p><p class="font-bold text-slate-800 text-sm">${p.sex||'-'}</p></div>
+        <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">เพศสภาพ (Gender)</p><p class="font-bold text-slate-800 text-sm">${p.gender||'-'}</p></div>
+        <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">อาชีพ (Occupation)</p><p class="font-bold text-slate-800 text-sm">${p.occupation||'-'}</p></div>
+        <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">แพ้ยา (Allergy)</p><p class="font-bold text-red-600 text-sm">${p.allergies||'ไม่มี'}</p></div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-red-50 p-6 rounded-2xl border border-red-100 shadow-sm">
+          <h4 class="text-red-800 font-bold mb-2 uppercase text-xs tracking-widest">Chief Complaint</h4>
+          <p class="text-red-600 font-bold text-xl">${p.chiefComplaints}</p>
+          <p class="text-slate-600 text-sm mt-3 leading-relaxed">${p.presentIllness}</p>
+        </div>
+        <div class="bg-blue-50 p-6 rounded-2xl border border-blue-100 shadow-sm">
+          <h4 class="text-blue-800 font-bold mb-4 uppercase text-xs tracking-widest">Vital Signs</h4>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="bg-white p-3 rounded-xl text-center shadow-sm"><p class="text-[10px] text-slate-400 font-bold">BP</p><p class="font-black text-slate-800 text-lg">${p.vitals.bloodPressure}</p></div>
+            <div class="bg-white p-3 rounded-xl text-center shadow-sm"><p class="text-[10px] text-slate-400 font-bold">HR</p><p class="font-black text-slate-800 text-lg">${p.vitals.heartRate}</p></div>
+            <div class="bg-white p-3 rounded-xl text-center shadow-sm"><p class="text-[10px] text-slate-400 font-bold">BT</p><p class="font-black text-slate-800 text-lg">${p.vitals.temperature}</p></div>
+            <div class="bg-white p-3 rounded-xl text-center shadow-sm"><p class="text-[10px] text-slate-400 font-bold">RR</p><p class="font-black text-slate-800 text-lg">${p.vitals.respiratoryRate}</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="bg-orange-50 p-6 rounded-2xl border border-orange-200 shadow-sm">
+        <h4 class="text-[#E35205] font-bold mb-2 uppercase text-xs tracking-widest">Physical Examination</h4>
+        <p class="text-slate-700 font-medium leading-relaxed">${p.physicalExam||'ไม่มีข้อมูล'}</p>
+      </div>
+      <div>
+        <h4 class="text-indigo-800 font-bold mb-4 text-lg">Gordon's Functional Health Patterns</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          ${p.gordonPatterns.map(g=>`
+          <div class="p-4 bg-white border border-slate-200 rounded-2xl hover:border-indigo-400 transition-all shadow-sm">
+            <p class="font-bold text-slate-800 text-sm mb-1">${g.name}</p>
+            <p class="text-sm text-slate-600 leading-relaxed">${g.notes||'-'}</p>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div class="bg-cyan-50 p-6 rounded-2xl border border-cyan-200 shadow-sm">
+        <h4 class="text-cyan-800 font-bold mb-4 uppercase text-xs">Nursing Progress Notes</h4>
+        ${p.nursingNotes.map(n=>`
+          <div class="bg-white p-4 rounded-xl border border-cyan-100 mb-2 flex gap-4">
+            <div class="bg-cyan-600 p-2 rounded-lg text-white font-bold text-[10px] h-fit whitespace-nowrap">${n.date}</div>
+            <div><p class="font-bold text-slate-800">${n.note}</p><p class="text-xs text-cyan-600 mt-1">บันทึกโดย: ${n.nurse}</p></div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  document.getElementById('patient-modal').classList.remove('hidden');
+  document.getElementById('patient-modal').classList.add('flex');
+}
+
+function closeModal() {
+  document.getElementById('patient-modal').classList.add('hidden');
+  document.getElementById('patient-modal').classList.remove('flex');
+}
+
+// ============================================================
+// Answer Sheet
+// ============================================================
+let currentHN = null;
+
+function renderCaseSelector() {
+  document.getElementById('case-selector').innerHTML = patients.map(p=>`
+    <button onclick="loadAnswerSheet('${p.hn}')" id="sel-${p.hn}"
+      class="px-4 py-2 rounded-xl border-2 font-bold text-sm transition-all border-slate-300 text-slate-600 hover:border-teal-500 hover:text-teal-700">
+      ${p.hn}<br><span class="font-normal text-xs">${p.name}</span>
+    </button>`).join('');
+}
+
+function loadAnswerSheet(hn) {
+  currentHN = hn;
+  const p = patients.find(x=>x.hn===hn);
+  const a = p.answerSheet;
+
+  // highlight selected
+  patients.forEach(x=>{
+    const btn = document.getElementById('sel-'+x.hn);
+    if(btn) btn.className = x.hn===hn
+      ? 'px-4 py-2 rounded-xl border-2 font-bold text-sm transition-all border-teal-500 bg-teal-50 text-teal-700'
+      : 'px-4 py-2 rounded-xl border-2 font-bold text-sm transition-all border-slate-300 text-slate-600 hover:border-teal-500 hover:text-teal-700';
+  });
+
+  const q = (num, label, content) => `
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-5">
+      <div class="bg-slate-50 px-6 py-3 border-b border-slate-200 flex items-center gap-3">
+        <span class="w-8 h-8 rounded-full bg-[#E35205] text-white flex items-center justify-center font-black text-sm flex-shrink-0">${num}</span>
+        <p class="font-bold text-slate-700 text-sm">${label}</p>
+      </div>
+      <div class="p-5">${content}</div>
+    </div>`;
+
+  // ข้อ 1: Subjective Data (เขียน)
+  const q1 = q(1,'ระบุ Subjective Data ของผู้ป่วย',`
+    <textarea id="ans1" rows="4" placeholder="กรอก Subjective Data..." class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"></textarea>
+    <div id="ans1-reveal" class="answer-hidden mt-3 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
+      <p class="font-bold mb-2">✅ เฉลย Subjective Data:</p>
+      <p class="leading-relaxed">• CC: ${p.chiefComplaints}<br>• PI: ${p.presentIllness}<br>• Gordon ที่เกี่ยวข้อง: ${a.subjective_hint||'ข้อมูลที่ผู้ป่วยหรือญาติบอก เช่น อาการ ความรู้สึก ประวัติ'}</p>
+    </div>`);
+
+  // ข้อ 2: Objective Data (เขียน)
+  const q2 = q(2,'ระบุ Objective Data ของผู้ป่วย',`
+    <textarea id="ans2" rows="4" placeholder="กรอก Objective Data..." class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"></textarea>
+    <div id="ans2-reveal" class="answer-hidden mt-3 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
+      <p class="font-bold mb-2">✅ เฉลย Objective Data:</p>
+      <p class="leading-relaxed">• Vitals: BP ${p.vitals.bloodPressure}, HR ${p.vitals.heartRate}, BT ${p.vitals.temperature}, RR ${p.vitals.respiratoryRate}<br>• Physical Exam: ${p.physicalExam}</p>
+    </div>`);
+
+  // ข้อ 3: ข้อวินิจฉัย (ตัวเลือก 1-4 เลือกได้ทุกข้อที่ถูก)
+  const q3choices = a.dx_choices.map((c,i)=>`
+    <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition-all">
+      <input type="checkbox" id="dx${i}" name="dx" value="${i}" class="mt-1 w-4 h-4 accent-teal-600">
+      <span class="text-sm font-medium text-slate-700"><span class="font-black text-[#E35205] mr-1">${i+1}.</span> ${c}</span>
+    </label>`).join('');
+  const q3 = q(3,'ระบุข้อวินิจฉัยทางการพยาบาลที่สอดคล้องกับผู้ป่วยรายนี้ (เลือกได้มากกว่า 1 ข้อ)',`
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">${q3choices}</div>
+    <div id="ans3-reveal" class="answer-hidden mt-4 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
+      <p class="font-bold mb-1">✅ เฉลย: ข้อที่ถูกต้องทั้งหมดคือ</p>
+      <p>${a.dx_correct.map(i=>`<strong>${i+1}.</strong> ${a.dx_choices[i]}`).join('<br>')}</p>
+    </div>`);
+
+  // ข้อ 4: จัดลำดับความสำคัญ (เขียน)
+  const q4 = q(4,'จัดลำดับความสำคัญของข้อวินิจฉัยทางการพยาบาล พร้อมระบุเหตุผล',`
+    <textarea id="ans4" rows="5" placeholder="ลำดับที่ 1: ...\nเหตุผล: ..." class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"></textarea>
+    <div id="ans4-reveal" class="answer-hidden mt-3 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 whitespace-pre-line">
+      <p class="font-bold mb-2">✅ เฉลย:</p>${a.dx_priority_answer}
+    </div>`);
+
+  // ข้อ 5: เป้าหมาย (เขียน)
+  const q5 = q(5,'เลือกข้อวินิจฉัย 1 ข้อ และตั้งเป้าหมายที่สอดคล้องกับผู้ป่วยรายนี้',`
+    <textarea id="ans5" rows="3" placeholder="เป้าหมายทางการพยาบาล..." class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"></textarea>
+    <div id="ans5-reveal" class="answer-hidden mt-3 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
+      <p class="font-bold mb-2">✅ เฉลย (ตัวอย่าง):</p><p>${a.goal_answer}</p>
+    </div>`);
+
+  // ข้อ 6: เกณฑ์การประเมินผล (ตัวเลือก + เขียน)
+  const q6choices = a.criteria_choices.map((c,i)=>`
+    <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition-all">
+      <input type="checkbox" id="cr${i}" name="cr" value="${i}" class="mt-1 w-4 h-4 accent-teal-600">
+      <span class="text-sm font-medium text-slate-700">${c}</span>
+    </label>`).join('');
+  const q6 = q(6,'กำหนดเกณฑ์การประเมินผลที่สอดคล้องกับข้อวินิจฉัย (เลือกได้มากกว่า 1 ข้อ หรือเพิ่มเติมได้)',`
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">${q6choices}</div>
+    <textarea id="ans6extra" rows="2" placeholder="เพิ่มเติม (ถ้ามี)..." class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"></textarea>
+    <div id="ans6-reveal" class="answer-hidden mt-4 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
+      <p class="font-bold mb-1">✅ เฉลย:</p>
+      <p>${a.criteria_correct.map(i=>`• ${a.criteria_choices[i]}`).join('<br>')}</p>
+    </div>`);
+
+  // ข้อ 7: กิจกรรมการพยาบาล (เขียน)
+  const q7 = q(7,'กำหนดกิจกรรมการพยาบาลที่สอดคล้องกับข้อวินิจฉัยทางการพยาบาล',`
+    <textarea id="ans7" rows="6" placeholder="1. ...\n2. ...\n3. ..." class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"></textarea>
+    <div id="ans7-reveal" class="answer-hidden mt-3 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 whitespace-pre-line">
+      <p class="font-bold mb-2">✅ เฉลย:</p>${a.nursing_activities_answer}
+    </div>`);
+
+  // ข้อ 8: การประเมินผล (เขียน)
+  const q8 = q(8,'ระบุการประเมินผลที่สอดคล้องกับข้อวินิจฉัยทางการพยาบาล',`
+    <textarea id="ans8" rows="4" placeholder="วิธีการประเมินผล..." class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"></textarea>
+    <div id="ans8-reveal" class="answer-hidden mt-3 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 whitespace-pre-line">
+      <p class="font-bold mb-2">✅ เฉลย:</p>${a.evaluation_answer}
+    </div>`);
+
+  document.getElementById('answer-sheet-container').innerHTML = `
+    <!-- หัวกระดาษ (แสดงตอน print) -->
+    <div class="mb-6 pb-5 border-b-2 border-slate-300">
+      <p class="text-xs text-slate-400 uppercase tracking-widest no-print">กรณีศึกษา</p>
+      <h3 class="text-2xl font-black text-slate-800">${p.name}</h3>
+      <p class="text-slate-500 text-sm">${p.hn} | อายุ ${p.age} ปี | ${p.sex} | ${p.occupation}</p>
+      <p class="text-slate-500 text-sm mt-1">CC: <span class="text-red-600 font-bold">${p.chiefComplaints}</span></p>
+    </div>
+
+    <!-- ปุ่มเฉลย -->
+    <div class="flex gap-3 mb-6 no-print">
+      <button onclick="revealAll()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all">
+        👁️ เปิดเฉลยทั้งหมด
+      </button>
+      <button onclick="hideAll()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-5 py-2.5 rounded-xl font-bold text-sm transition-all">
+        🙈 ซ่อนเฉลยทั้งหมด
+      </button>
+    </div>
+
+    ${q1}${q2}${q3}${q4}${q5}${q6}${q7}${q8}`;
+}
+
+function revealAll() {
+  document.querySelectorAll('[id$="-reveal"]').forEach(el => el.classList.remove('answer-hidden'));
+}
+function hideAll() {
+  document.querySelectorAll('[id$="-reveal"]').forEach(el => el.classList.add('answer-hidden'));
+}
+
+// ============================================================
+// Navigation
+// ============================================================
+function showSection(section) {
+  document.querySelectorAll('main > section').forEach(s=>s.classList.add('hidden'));
+  document.getElementById('section-'+section).classList.remove('hidden');
+  document.querySelectorAll('.sidebar-item').forEach(i=>i.classList.remove('active'));
+  document.getElementById('btn-'+section).classList.add('active');
+}
+
+// Init
+renderDashboard();
+renderPatientsTable();
+renderCaseSelector();
+</script>
+</body>
+</html>
